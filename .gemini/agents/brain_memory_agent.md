@@ -15,7 +15,7 @@ tools:
   - run_shell_command
   - read_file
   - write_file
-  - replace_file_content
+  - replace
 max_turns: 15
 timeout_mins: 5
 ---
