@@ -46,3 +46,10 @@ brain remember "My Title" --body "Content" --tags "t1,t2" # Save a note
 brain ask "My query"                                      # Run FTS5 BM25 search
 brain rebuild                                             # Force re-index of markdown files
 ```
+
+
+# Run just 
+uv run pytest tests/test_complex_memory.py -v
+
+# Run all tests
+uv run pytest tests/ -v

@@ -102,7 +102,6 @@ def init() -> None:
 # ---------------------------------------------------------------------------
 # brain ask
 # ---------------------------------------------------------------------------
-
 @app.command()
 def ask(
     query: str = typer.Argument(..., help="Natural language question or keyword string"),
@@ -117,7 +116,7 @@ def ask(
     This is the primary command for AI memory retrieval.
     """
     _ensure_index()
-    results = read_top(query, top_k=top)
+    results = read_top(query, top_k=top, category=category)  # <-- FIX HERE
 
     if not results:
         data: dict = {"query": query, "answer": None, "sources": [], "count": 0}
@@ -259,11 +258,11 @@ def forget(
     _ensure_index()
     note = find_note(slug)
     if not note:
-        msg = {"status": "not_found", "slug": slug}
-        if json_out:
-            print(json.dumps(msg, indent=2))
-        else:
-            console.print(f"[red]Note not found:[/red] {slug}")
+        # Try a quick fuzzy fallback
+        similar = find_similar(slug, threshold=0.01)
+        console.print(f"[red]Note not found:[/red] {slug}")
+        if similar:
+            console.print(f"[dim]Did you mean:[/dim] [cyan]{similar[0].slug}[/cyan]?")
         raise typer.Exit(1)
 
     if not yes:
