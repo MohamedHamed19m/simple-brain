@@ -458,6 +458,37 @@ def stats(
 
 
 # ---------------------------------------------------------------------------
+# brain gui
+# ---------------------------------------------------------------------------
+
+@app.command()
+def gui(
+    font_size: int = typer.Option(
+        20, "--font-size", "-s",
+        help="Base font size (default 20). Decrease for smaller screens, e.g. --font-size 13.",
+        min=8, max=40,
+    ),
+) -> None:
+    """
+    [bold]Launch the customtkinter vault browser GUI.[/bold]
+
+    Opens a desktop window showing all notes grouped by category,
+    with inline editing, search, delete, and index rebuild.
+
+    Use [bold]--font-size[/bold] to scale the UI for large monitors:
+    \b
+      brain gui --font-size 20
+    """
+    _ensure_index()
+    vault = get_vault_dir()
+    ensure_structure(vault)
+    # lazy import — customtkinter is heavy; only loaded when `brain gui` runs
+    from brain.gui import run as gui_run
+
+    gui_run(vault=vault, font_size=font_size)
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
