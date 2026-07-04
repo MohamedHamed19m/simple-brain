@@ -1,8 +1,8 @@
 # Simple Brain — Personal Knowledge Base
 
-A portable Python CLI compiled to a single executable that acts as your external memory — pure BM25 search over markdown files, no embedding models, no API keys, and no global Python dependencies required.
+A portable, standalone Python CLI compiled to a single executable that acts as your external memory — pure BM25 search over markdown files, no embedding models, no API keys, and no global Python dependencies required.
 
-Designed specifically to work with Gemini CLI subagents (`@memory` and `@memory-curator`) by isolating memory retrieval from your main coding context.
+Designed specifically to work with Gemini CLI subagents (`@brain_memory_agent`) by isolating memory retrieval and curation from your main coding context.
 
 ---
 
@@ -85,11 +85,11 @@ brain ask "title:openssl"              # Field-specific search
 
 ---
 
-## Subagents for Gemini CLI
+## Subagent and Skill Configuration
 
-Two custom subagent definitions are configured in `~/.gemini/agents/`:
+This repository packages a unified subagent and skill inside the `.gemini/` folder:
 
-1. **`@memory`** (`memory.md`): A read-only retrieval subagent that handles matching, reading, and summarizing notes. It has no write permissions.
-2. **`@memory-curator`** (`memory_curator.md`): A read/write curator agent that checks for duplicates, updates files, and maintains index integrity.
+1. **`@brain_memory_agent`** (`.gemini/agents/brain_memory_agent.md`): A single subagent handling both **retrieval** (searching, showing notes) and **curation** (saving, updating, merging, rebuilding). It operates in an isolated context window to avoid context pollution in the main coding thread.
+2. **`brain-memory` Skill** (`.gemini/skills/brain-memory/SKILL.md`): Instructs the main orchestrator (primary model) to automatically delegate all note searches, memory lookups, and curation requests directly to the `brain_memory_agent` subagent.
 
-Because both subagents use the global `brain` command, they run seamlessly as long as `brain.exe` is added to your environment `PATH`.
+Ensure that the compiled `brain` binary is on your system's `PATH` for the subagent to run its search commands.
