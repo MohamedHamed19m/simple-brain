@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.ruff_cache/
+
+# Virtual Environments
+.venv/
+venv/
+env/
+
+# PyInstaller / Build Artifacts
+build/
+dist/
+*.spec
+
+# Packaging / Distribution
+*.egg-info/
+.eggs/
+
+# IDEs / Editors
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# OS System files
+Thumbs.db
+db.db
+Desktop.ini
+.DS_Store

@@ -1,17 +1,30 @@
-# Brain — Personal Knowledge Base
+# Simple Brain — Personal Knowledge Base
 
-A Python CLI that acts as your external memory — pure BM25 search over markdown files, no embedding models, no API keys required.
+A portable Python CLI compiled to a single executable that acts as your external memory — pure BM25 search over markdown files, no embedding models, no API keys, and no global Python dependencies required.
 
-## Quick Start
+Designed specifically to work with Gemini CLI subagents (`@memory` and `@memory-curator`) by isolating memory retrieval from your main coding context.
 
+---
+
+## Installation & Portability
+
+### 1. Compile to a Single Executable
+Use PyInstaller via `uv` to build the standalone binary:
 ```bash
-# Install globally with uv
-uv tool install simple-brain
+# Clean install dependencies
+uv sync
 
-# Or editable install for development
-uv pip install -e .
+# Compile to a single EXE
+uv run pyinstaller --onefile --name brain --console brain/cli.py
+```
+The compiled executable will be generated at `./dist/brain.exe`.
 
-# Initialize your vault
+### 2. Make it Global
+Move or copy `dist/brain.exe` to any directory included in your system's `PATH` environment variable (e.g., `C:\Users\user\bin` or similar).
+
+Once added, you can call it from any folder:
+```bash
+# Initialize your vault (defaults to ~/.brain/)
 brain init
 
 # Add a note
@@ -19,10 +32,9 @@ brain remember "OpenSSL MinGW Linking" --body "Mixing MSVC OpenSSL with MinGW ca
 
 # Query it
 brain ask "how do I fix openssl linking"
-
-# Machine-readable JSON (for AI agents)
-brain ask "openssl mingw" --json
 ```
+
+---
 
 ## Commands
 
@@ -30,117 +42,54 @@ brain ask "openssl mingw" --json
 |---------|-------------|
 | `brain init` | Create vault structure and initialize index |
 | `brain ask <query>` | BM25 search + compress → structured answer |
-| `brain remember <title>` | Add a new note (opens `$EDITOR` or use `--body`) |
-| `brain forget <slug>` | Delete a note |
+| `brain remember <title>` | Add a note (opens `$EDITOR` or uses `--body`) |
+| `brain forget <slug>` | Delete a note from the vault and the index |
 | `brain show <slug>` | Print full note content |
-| `brain list` | List all notes |
-| `brain rebuild` | Rebuild FTS5 index from disk |
-| `brain stats` | Vault statistics |
+| `brain list` | List all notes currently in the vault |
+| `brain rebuild` | Rebuild the SQLite FTS5 search index from files |
+| `brain stats` | View vault statistics and category counts |
 
-All commands support `--json` for machine-readable output.
+All commands support the `--json` flag for machine-readable outputs.
+
+---
 
 ## Vault Structure
 
-The vault defaults to `~/.brain/`. Override with `$BRAIN_VAULT`:
+The vault defaults to `~/.brain/`. You can override this location by setting the `BRAIN_VAULT` environment variable.
 
 ```
 ~/.brain/
-├── knowledge/      # permanent facts, solutions
-├── skills/         # how-to guides
-├── journal/        # time-stamped reflections
-├── projects/       # project-specific context
-├── inbox/          # unclassified (default)
+├── knowledge/      # Permanent facts, solutions
+├── skills/         # How-to guides, workflows
+├── journal/        # Time-stamped reflections, logs
+├── projects/       # Project-specific context
+├── inbox/          # Unclassified / incoming notes (default)
 └── .brain_index.db # SQLite FTS5 index (auto-managed)
 ```
+
+---
 
 ## Search Syntax
 
 `brain ask` supports full SQLite FTS5 syntax:
 
 ```bash
-brain ask "openssl mingw"              # implicit AND
-brain ask "openssl AND mingw"          # explicit AND
-brain ask '"secure channel"'           # phrase search
-brain ask "open*"                      # prefix match
-brain ask "title:openssl"              # field-specific
+brain ask "openssl mingw"              # Implicit AND
+brain ask "openssl AND mingw"          # Explicit AND
+brain ask '"secure channel"'           # Phrase search
+brain ask "open*"                      # Prefix match
+brain ask "title:openssl"              # Field-specific search
 ```
 
-Column weights: `title × 5`, `tags × 3`, `body × 1`
+*Column weights: Title × 5.0, Tags × 3.0, Body × 1.0*
 
-## JSON Output for AI Agents
-
-```bash
-brain ask "how to build vsomeip" --json
-```
-
-```json
-{
-  "query": "how to build vsomeip",
-  "answer": "### [Building vSomeIP] (knowledge/build-vsomeip.md)  score=0.98\n\n...",
-  "sources": [
-    {
-      "slug": "build-vsomeip",
-      "path": "knowledge/build-vsomeip.md",
-      "title": "Building vSomeIP",
-      "score": 0.98,
-      "snippet": "**vSomeIP** requires Boost ≥ 1.66…",
-      "tags": ["c++", "someip", "build"]
-    }
-  ],
-  "count": 1
-}
-```
-
-## Subagent Skills
-
-Two Antigravity skills are included in `.agents/skills/`:
-
-- **`@memory`** — Read-only retrieval agent
-- **`@memory-curator`** — Read/write curation agent
-
-See `.agents/skills/memory/SKILL.md` and `.agents/skills/memory-curator/SKILL.md`.
-
-## Note Format
-
-Every note is a standard markdown file with YAML frontmatter:
-
-```markdown
----
-title: OpenSSL MinGW Linking
-tags: [c++, build, openssl]
-category: knowledge
-created: 2026-07-04
-updated: 2026-07-04T14:30:00
 ---
 
-Mixing MSVC OpenSSL with MinGW causes linker errors.
-Use MinGW64 binaries consistently.
-```
+## Subagents for Gemini CLI
 
-## Configuration
+Two custom subagent definitions are configured in `~/.gemini/agents/`:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `BRAIN_VAULT` | `~/.brain` | Vault root directory |
-| `EDITOR` | `notepad` / `nano` | Editor for `brain remember` |
+1. **`@memory`** (`memory.md`): A read-only retrieval subagent that handles matching, reading, and summarizing notes. It has no write permissions.
+2. **`@memory-curator`** (`memory_curator.md`): A read/write curator agent that checks for duplicates, updates files, and maintains index integrity.
 
-## Architecture
-
-```
-brain ask "query"
-     │
-     ▼
-SQLite FTS5 (BM25)        ← pure math, no ML
-     │
-     ▼
-Load top-k markdown files
-     │
-     ▼
-TF-overlap paragraph scorer
-     │
-     ▼
-Compress to char budget
-     │
-     ▼
-JSON response (~300-500 tokens)
-```
+Because both subagents use the global `brain` command, they run seamlessly as long as `brain.exe` is added to your environment `PATH`.

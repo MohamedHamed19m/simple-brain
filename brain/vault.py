@@ -133,8 +133,12 @@ def iter_notes(vault: Path | None = None) -> Generator[Note, None, None]:
     """Yield every note in the vault, skipping hidden files."""
     root = vault or get_vault_dir()
     for md in sorted(root.rglob("*.md")):
-        # skip dotfiles / hidden dirs
-        if any(part.startswith(".") for part in md.parts):
+        # skip dotfiles / hidden dirs — only check parts *relative* to vault root
+        try:
+            rel_parts = md.relative_to(root).parts
+        except ValueError:
+            rel_parts = md.parts
+        if any(part.startswith(".") for part in rel_parts):
             continue
         try:
             yield load_note(md)

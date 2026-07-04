@@ -9,6 +9,9 @@ Column weights passed to bm25():
   tags   × 3.0
   body   × 1.0   (base)
   (slug, rel_path, category are UNINDEXED — weight 0)
+
+Natural-language queries ("how do I fix openssl") are pre-processed:
+stop-words are stripped and only content words are passed to FTS5.
 """
 
 from __future__ import annotations
@@ -104,14 +107,23 @@ def _run_search(
     if not rows:
         return []
 
-    # Normalize scores: map [min_raw, 0] → [1, 0]
+    # Normalize scores to [0, 1].
+    # bm25 returns negatives; more negative = better.
+    # With a single result min_raw == max_raw → give it score 1.0.
     raw_scores = [r["raw_score"] for r in rows]
-    min_raw = min(raw_scores)
-    span = abs(min_raw) if min_raw != 0 else 1.0
+    min_raw = min(raw_scores)  # most-relevant (most negative)
+    max_raw = max(raw_scores)  # least-relevant
+    span = abs(min_raw - max_raw) if min_raw != max_raw else 1.0
 
     results = []
     for row in rows:
-        norm = 1.0 - (abs(row["raw_score"]) / span) if min_raw != 0 else 1.0
+        if min_raw == max_raw:
+            # Only one result (or all tied) → perfect score
+            norm = 1.0
+        else:
+            # Map: min_raw (best) → 1.0, max_raw (worst) → 0.0
+            norm = (abs(row["raw_score"]) - abs(max_raw)) / span
+            norm = round(max(0.0, min(1.0, norm)), 4)
         results.append(
             SearchResult(
                 slug=row["slug"],
@@ -126,20 +138,45 @@ def _run_search(
     return results
 
 
+# Common English stop words to strip from natural-language queries
+_STOP = frozenset(
+    "a an the is are was were be been being have has had do does did "
+    "will would shall should may might must can could for and but or "
+    "nor yet so at by in of on to up as if it its i you we they he she "
+    "how what when where why who which that this these those".split()
+)
+
+
 def _sanitize_query(q: str) -> str:
     """
-    Make the query safe for FTS5 MATCH without disabling advanced syntax.
-    Strips lone special chars that would cause parse errors.
+    Prepare a query string for SQLite FTS5 MATCH.
+
+    - If the query looks like an FTS5 expression (has AND/OR/NOT or column:
+      syntax), pass it through unchanged.
+    - Otherwise treat it as natural language: strip stop-words and punctuation,
+      then let FTS5 do an implicit AND across the remaining content words.
     """
-    # If the user wrote a valid FTS5 expression (contains operators), pass through
     fts5_ops = {"AND", "OR", "NOT"}
-    if any(op in q.upper().split() for op in fts5_ops):
+    words = q.split()
+
+    # Pass through explicit FTS5 expressions
+    if any(op in (w.upper() for w in words) for op in fts5_ops):
         return q
-    # Otherwise wrap in implicit AND by leaving it as-is (FTS5 default)
-    # but strip characters that cause parse errors when bare
-    safe = q.replace('"', ' ').replace("'", " ")
-    safe = safe.strip()
-    return safe or '""'
+    if any(":" in w for w in words):  # column:term syntax
+        return q
+
+    # Strip punctuation and stop-words
+    import re as _re
+    tokens = _re.findall(r"[a-zA-Z0-9]+", q)
+    content = [t for t in tokens if t.lower() not in _STOP and len(t) > 1]
+
+    if not content:
+        # Fallback: use original stripped of bare special chars
+        safe = q.replace('"', ' ').replace("'", " ").strip()
+        return safe or '""'
+
+    # Join as implicit AND (FTS5 default for space-separated terms)
+    return " ".join(content)
 
 
 # ---------------------------------------------------------------------------
