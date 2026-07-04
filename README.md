@@ -51,6 +51,7 @@ The vault defaults to `~/.brain/`. You can override this location by setting the
 ├── journal/        # Time-stamped reflections, logs
 ├── projects/       # Project-specific context
 ├── inbox/          # Unclassified / incoming notes (default)
+├── <any-category>/ # Create your own via --category
 └── .brain_index.db # SQLite FTS5 index (auto-managed)
 ```
 
