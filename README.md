@@ -16,22 +16,9 @@ uv sync
 
 # Compile to a single EXE
 uv run pyinstaller --onefile --name brain --console brain/cli.py
-```
-The compiled executable will be generated at `./dist/brain.exe`.
 
-### 2. Make it Global
-Move or copy `dist/brain.exe` to any directory included in your system's `PATH` environment variable (e.g., `C:\Users\user\bin` or similar).
-
-Once added, you can call it from any folder:
-```bash
-# Initialize your vault (defaults to ~/.brain/)
-brain init
-
-# Add a note
-brain remember "OpenSSL MinGW Linking" --body "Mixing MSVC OpenSSL with MinGW causes linker errors. Use MinGW64 binaries consistently." --tags "c++,build,openssl" --category knowledge
-
-# Query it
-brain ask "how do I fix openssl linking"
+# Install globally in editable mode using uv
+uv tool install --editable .                              
 ```
 
 ---
@@ -92,4 +79,20 @@ This repository packages a unified subagent and skill inside the `.gemini/` fold
 1. **`@brain_memory_agent`** (`.gemini/agents/brain_memory_agent.md`): A single subagent handling both **retrieval** (searching, showing notes) and **curation** (saving, updating, merging, rebuilding). It operates in an isolated context window to avoid context pollution in the main coding thread.
 2. **`brain-memory` Skill** (`.gemini/skills/brain-memory/SKILL.md`): Instructs the main orchestrator (primary model) to automatically delegate all note searches, memory lookups, and curation requests directly to the `brain_memory_agent` subagent.
 
-Ensure that the compiled `brain` binary is on your system's `PATH` for the subagent to run its search commands.
+
+Add this Section into your main contentx file (Gemini.md)
+### 🧠 Memory Management & Strict Delegation
+
+**CRITICAL:** You MUST delegate all memory tasks to the **`@brain_memory_agent`**,
+
+**When to Invoke `@brain_memory_agent`:**
+* **Save/Remember:** To store solutions, context, or snippets (e.g., "save this", "remember"). (Subagent runs `brain remember`).
+* **Search/Retrieve:** To recall past knowledge or query notes. (Subagent runs `brain ask/show`).
+* **Manage:** To list notes, delete (`brain forget`), or update (`brain rebuild`).
+
+**Data Handoff Protocol (Strict Rules):**
+* **Process First:** You (the main orchestrator) must read files and synthesize the data *before* calling the subagent. The subagent is blind to your workspace.
+* **Pass Value, Not Reference:** Provide the exact text to save directly in the prompt. NEVER pass file paths or ask the subagent to read files.
+9 * **✅ CORRECT Handoff:** `@brain_memory_agent Save note 'NvM Tool'. Body: 'This Tool handles SWC integration...' Tags: autosar, nvm`
+10
+11 * **❌ INCORRECT Handoff:** `@brain_memory_agent Read Readme_Nvm_Tool.md and save it.`

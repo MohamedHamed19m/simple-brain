@@ -30,6 +30,8 @@ uv tool install .                                         # Install globally usi
 uv run pyinstaller --onefile --name brain --console brain/cli.py # Build the portable standalone brain.exe binary
 ```
 
+it depend on the user does it want exe (pyinstaller) or want global installed tool (uv tool install --editable .)
+
 ### Local Testing (via uv)
 ```powershell
 uv run brain init                                         # Init local vault directories

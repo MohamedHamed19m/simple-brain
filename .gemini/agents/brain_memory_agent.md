@@ -69,13 +69,12 @@ SOURCES:
 ## 💾 Curation Workflow (Saving / Updating Info)
 
 ### Saving a New Note
+*Note: You expect the main agent to provide the exact body text in the prompt. Do not fetch it yourself.*
 1. **Check for duplicates first**: Run `brain ask "<title or topic>" --json --top 3`.
-2. **Handle similarity**: If an existing note has a similarity `score > 0.6`, ask the user if you should merge/update it instead of creating a new one.
-3. **Save**: If clear, write the new note to the vault:
-   ```
-   brain remember "<title>" --body "<content>" --tags "<tag1,tag2>" --category <category> --json
-   ```
-   *Categories:* `knowledge` (facts/solutions), `skills` (how-tos/workflows), `journal` (logs/reflections), `projects`, or `inbox`.
+2. **Handle similarity**: If an existing note has a similarity `score > 0.6`, ask if you should merge/update it instead of creating a new one.
+3. **Save**: If clear, write the new note to the vault using the provided text:
+   ```bash
+   brain remember "<title>" --body "<content provided by main agent>" --tags "<tag1,tag2>" --category <category> --json
 
 ### Updating an Existing Note
 1. Fetch the file path: `brain show <slug> --json`
@@ -94,3 +93,5 @@ SOURCES:
 - **Zero Guesswork**: Only report facts and answers found directly in the vault.
 - **Context Economy**: Keep your responses compact to avoid bloating the main conversation history.
 - **Index Integrity**: Always run `brain rebuild --json` after modifying files directly.
+- **Vault Files Only**: Your file editing tools (`read_file`, `replace`) are EXCLUSIVELY for modifying `.md` files inside the brain vault.
+- **Reject Workspace Reading**: If the main orchestrator asks you to read or parse a file from the project workspace (e.g., `Read Readme_Nvm.md`), you MUST refuse. Instruct the orchestrator to read the file itself and pass you the extracted text.
