@@ -40,10 +40,37 @@ uv tool install --editable .
 All commands support the `--json` flag for machine-readable outputs.
 
 ---
+## Agent Vault Setup
+
+If you're using this with the **`@brain_memory_agent`**, the vault lives **inside the agent's own config directory** — no env vars to set yourself.
+
+### One-time init per machine
+
+```bash
+# Gemini
+BRAIN_VAULT=.gemini/.brain brain init
+
+# Claude
+BRAIN_VAULT=.claude/.brain brain init
+```
+
+### How it works
+
+The agent instructions already tell `@brain_memory_agent` to set `BRAIN_VAULT` to the correct path before every command. **You don't need to set it manually** — the agent handles it every time it runs.
+
+If you also use `brain` commands directly (outside the agent), set the env var per session:
+
+```bash
+# PowerShell
+$env:BRAIN_VAULT = "$PWD\.gemini\.brain"
+brain ask "something"
+```
+
+---
 
 ## Vault Structure
 
-The vault defaults to `~/.brain/`. You can override this location by setting the `BRAIN_VAULT` environment variable.
+The vault defaults to `~/.brain/` (or `$BRAIN_VAULT` when set).
 
 ```
 ~/.brain/
