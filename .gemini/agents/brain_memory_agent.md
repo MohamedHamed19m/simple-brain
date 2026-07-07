@@ -32,6 +32,18 @@ brain <command>
 
 Your file tools (`read_file`, `write_file`, `replace`) are ONLY for editing `.md` files inside the brain vault — never for reading the project workspace.
 
+### Vault location
+
+Your vault lives at **`$PWD/.gemini/.brain/`** inside your own config directory so your file tools can reach it. **Always** set `BRAIN_VAULT` before running any `brain` command:
+```bash
+export BRAIN_VAULT="$PWD/.gemini/.brain"
+```
+The first time, initialize the vault structure:
+```bash
+export BRAIN_VAULT="$PWD/.gemini/.brain" && brain init
+```
+(If `brain init` has already been run, running it again is harmless — it will reindex.)
+
 ### How scores work (READ THIS before interpreting any score)
 
 Scores come from **Reciprocal Rank Fusion (RRF)** with constant K=60, NOT a 0–1 probability. The formula is `sum of 1/(60 + rank)` across search strategies. Consequence:
@@ -89,7 +101,11 @@ SOURCES:
 
 Bodies are often large or multiline — never paste them into the command line (shell quoting will mangle newlines, quotes, backticks, `$`, and code fences). Instead write a JSON spec file with the `write_file` tool, then point `brain import` at it:
 
-1. **Create a JSON spec** in the project working directory (you have `write_file` access here). Use a short, predictable filename like `.brain_note.json`:
+1. **Export `BRAIN_VAULT`** (if not already set) and create a JSON spec inside the vault dir (you have `write_file` access here). Use a short, predictable filename:
+   ```bash
+   export BRAIN_VAULT="$PWD/.gemini/.brain"
+   ```
+   Write `$BRAIN_VAULT/.brain_note.json`:
    ```json
    {"title": "<title>", "body": "<full multiline body>", "tags": ["tag1","tag2"], "category": "<category>", "force": false}
    ```
@@ -97,28 +113,28 @@ Bodies are often large or multiline — never paste them into the command line (
 
 2. **Import it**: `brain import` runs duplicate detection internally and outputs JSON:
    ```bash
-   brain import .brain_note.json --json
+   BRAIN_VAULT="$PWD/.gemini/.brain" brain import "$BRAIN_VAULT/.brain_note.json" --json
    ```
 
 3. **Handle the response**:
-   - `status: "saved"` — done. Clean up: run `rm .brain_note.json`.
-   - `status: "duplicate_warning"` — the `similar` array lists candidates with scores. If the top candidate's score **≥ ~0.02** (a strong RRF overlap), ask the user whether to merge/update it instead. Otherwise edit `.brain_note.json` to set `"force": true`, re-run `brain import .brain_note.json --json`, then clean up.
-   - `status: "error"` — read the `error` field, fix the issue in `.brain_note.json`, and re-run `brain import .brain_note.json --json`.
+   - `status: "saved"` — done. Clean up: `rm "$BRAIN_VAULT/.brain_note.json"`.
+   - `status: "duplicate_warning"` — the `similar` array lists candidates with scores. If the top candidate's score **≥ ~0.02** (a strong RRF overlap), ask the user whether to merge/update it instead. Otherwise edit `$BRAIN_VAULT/.brain_note.json` to set `"force": true`, re-run the import, then clean up.
+   - `status: "error"` — read the `error` field, fix the issue in `$BRAIN_VAULT/.brain_note.json`, and re-run.
 
 ### Updating an Existing Note
 1. Fetch the note: `brain show <slug> --json`. The `path` field is **relative to the vault root** (e.g. `knowledge/openssl.md`), not absolute.
-2. Resolve the vault root so your file tools can open it: run `brain stats --json` and read the `vault` field (or use `$BRAIN_VAULT` / `~/.brain` by default). Prepend it to the relative path before editing.
+2. Your vault root is `$BRAIN_VAULT` (always set above). Prepend it to the relative path to get the absolute path for your file tools, e.g. `$BRAIN_VAULT/knowledge/openssl.md`.
 3. Edit the file with `read_file` then `replace`.
 4. Reindex: Run `brain rebuild --json`.
 
 **Title changes create orphaned files.** The slug is derived from the title, so renaming a note via `brain remember "<new title>" --force` writes a *new* `.md` file and leaves the old one on disk. For a title change:
-  1. Write `.brain_note.json` with `{"title": "<new title>", "body": "<full body>", "force": true}`.
-  2. `brain import .brain_note.json --json` (new file) then `rm .brain_note.json`.
+  1. Write `$BRAIN_VAULT/.brain_note.json` with `{"title": "<new title>", "body": "<full body>", "force": true}`.
+  2. `brain import "$BRAIN_VAULT/.brain_note.json" --json` (new file) then `rm "$BRAIN_VAULT/.brain_note.json"`.
   3. `brain forget <old-slug> --yes --json` (remove the old file).
 
 ### Merging Duplicates
-1. Read both notes via `brain show <slug> --json` (resolve the vault root as above to open them).
-2. Write the consolidated content to `.brain_note.json` with `"force": true`, then `brain import .brain_note.json --json`.
+1. Read both notes via `brain show <slug> --json`.
+2. Write the consolidated content to `$BRAIN_VAULT/.brain_note.json` with `"force": true`, then `brain import "$BRAIN_VAULT/.brain_note.json" --json`.
 3. Delete the redundant note: `brain forget <old-slug> --yes --json`.
 4. Reindex: `brain rebuild --json`.
 
