@@ -152,7 +152,7 @@ def find_note(slug_or_path: str, vault: Path | None = None) -> Note | None:
     root = vault or get_vault_dir()
     # exact path match
     p = root / slug_or_path
-    if p.exists():
+    if p.is_file():
         return load_note(p)
     # stem match — search recursively
     for md in root.rglob("*.md"):
