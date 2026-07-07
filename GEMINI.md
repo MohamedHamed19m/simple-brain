@@ -17,7 +17,7 @@ A portable, standalone Python CLI acting as an external memory system. It uses p
 
 - **No Embeddings / ML**: Search must rely purely on SQLite FTS5 and BM25 math.
 - **Portability**: All logic must package into a single standalone `.exe` using PyInstaller. Avoid runtime dependencies on Python or virtual environments inside the built binary.
-- **Agent Integration**: Keep output commands clean. Commands like `ask`, `remember`, `forget`, `show`, `list`, `rebuild`, and `stats` must support a `--json` option for clean, token-efficient parser communication with Gemini CLI subagents.
+- **Agent Integration**: Keep output commands clean. Commands like `ask`, `remember`, `import`, `forget`, `show`, `list`, `rebuild`, and `stats` must support a `--json` option for clean, token-efficient parser communication with Gemini CLI subagents.
 - **SQLite Optimization**: Use WAL journal mode and normal synchronous flags for safe, concurrent SQLite access.
 
 ## Common Commands
@@ -42,7 +42,8 @@ uv run brain stats                                        # Inspect vault stats
 
 ### Executable Run (After building & adding to PATH)
 ```powershell
-brain remember "My Title" --body "Content" --tags "t1,t2" # Save a note
+brain remember "My Title" --body "Content" --tags "t1,t2" # Save a note (short body)
+brain import my_note.json --json                          # Save a note from JSON spec (large/multiline bodies)
 brain ask "My query"                                      # Run FTS5 BM25 search
 brain rebuild                                             # Force re-index of markdown files
 ```

@@ -86,11 +86,24 @@ SOURCES:
 
 ### Saving a New Note
 *Note: You expect the main agent to provide the exact body text in the prompt. Do not fetch it yourself.*
-1. **Save**: write the new note using the provided text. `brain remember` runs duplicate detection internally and will emit a `duplicate_warning` status if a similar note exists:
-   ```bash
-   brain remember "<title>" --body "<content provided by main agent>" --tags "<tag1,tag2>" --category <category> --json
+
+Bodies are often large or multiline — never paste them into the command line (shell quoting will mangle newlines, quotes, backticks, `$`, and code fences). Instead write a JSON spec file with the `write_file` tool, then point `brain import` at it:
+
+1. **Create a JSON spec** in the project working directory (you have `write_file` access here). Use a short, predictable filename like `.brain_note.json`:
+   ```json
+   {"title": "<title>", "body": "<full multiline body>", "tags": ["tag1","tag2"], "category": "<category>", "force": false}
    ```
-2. **Handle duplicates**: If the JSON `status` is `duplicate_warning`, the `similar` array lists candidates with their scores. If the top candidate's score **≥ ~0.02** (a strong RRF overlap), ask the user whether to merge/update it instead of creating a new note. Otherwise re-run `brain remember ... --force --json` to save anyway.
+   **Always use the `write_file` tool** to create this file — never `echo` or heredoc JSON through the shell (that would hit the same escaping trap that broke `--body`).
+
+2. **Import it**: `brain import` runs duplicate detection internally and outputs JSON:
+   ```bash
+   brain import .brain_note.json --json
+   ```
+
+3. **Handle the response**:
+   - `status: "saved"` — done. Clean up: run `rm .brain_note.json`.
+   - `status: "duplicate_warning"` — the `similar` array lists candidates with scores. If the top candidate's score **≥ ~0.02** (a strong RRF overlap), ask the user whether to merge/update it instead. Otherwise edit `.brain_note.json` to set `"force": true`, re-run `brain import .brain_note.json --json`, then clean up.
+   - `status: "error"` — read the `error` field, fix the issue in `.brain_note.json`, and re-run `brain import .brain_note.json --json`.
 
 ### Updating an Existing Note
 1. Fetch the note: `brain show <slug> --json`. The `path` field is **relative to the vault root** (e.g. `knowledge/openssl.md`), not absolute.
@@ -98,11 +111,14 @@ SOURCES:
 3. Edit the file with `read_file` then `replace`.
 4. Reindex: Run `brain rebuild --json`.
 
-**Title changes create orphaned files.** The slug is derived from the title, so renaming a note via `brain remember "<new title>" --force` writes a *new* `.md` file and leaves the old one on disk. For a title change, do: `brain remember "<new title>" --body "..." --json` (new file) then `brain forget <old-slug> --yes --json` (remove the old file).
+**Title changes create orphaned files.** The slug is derived from the title, so renaming a note via `brain remember "<new title>" --force` writes a *new* `.md` file and leaves the old one on disk. For a title change:
+  1. Write `.brain_note.json` with `{"title": "<new title>", "body": "<full body>", "force": true}`.
+  2. `brain import .brain_note.json --json` (new file) then `rm .brain_note.json`.
+  3. `brain forget <old-slug> --yes --json` (remove the old file).
 
 ### Merging Duplicates
 1. Read both notes via `brain show <slug> --json` (resolve the vault root as above to open them).
-2. Save the consolidated content: `brain remember "<merged title>" --body "<merged content>" --force --json`.
+2. Write the consolidated content to `.brain_note.json` with `"force": true`, then `brain import .brain_note.json --json`.
 3. Delete the redundant note: `brain forget <old-slug> --yes --json`.
 4. Reindex: `brain rebuild --json`.
 
