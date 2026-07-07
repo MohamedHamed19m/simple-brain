@@ -33,7 +33,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from brain.config import ensure_structure, get_index_path, get_vault_dir
+from brain.config import DEFAULT_CATEGORY, ensure_structure, get_index_path, get_vault_dir
 from brain.index import init_db, rebuild_index, remove_note, upsert_note
 from brain.search import find_similar, read_top, search
 from brain.summarizer import compress
@@ -167,7 +167,7 @@ def _save_note(
     title: str,
     body: str,
     tag_list: list[str],
-    category: str = "inbox",
+    category: str = DEFAULT_CATEGORY,
     force: bool = False,
     json_out: bool = False,
 ) -> None:
@@ -242,7 +242,7 @@ def remember(
     body: Optional[str] = typer.Option(None, "--body", help="Note body (skip editor). Use --body-file for large/multiline bodies."),
     body_file: Optional[Path] = typer.Option(None, "--body-file", help="Read body from a file (avoids shell quoting for large/multiline text). Takes precedence over --body."),
     tags: Optional[str] = typer.Option(None, "--tags", help="Comma-separated tags"),
-    category: str = typer.Option("inbox", "--category", "-c", help="Category sub-directory"),
+    category: str = typer.Option(DEFAULT_CATEGORY, "--category", "-c", help="Category sub-directory"),
     force: bool = typer.Option(False, "--force", help="Overwrite if slug already exists"),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
@@ -327,7 +327,7 @@ def import_note(
     else:
         tag_list = []
 
-    category = data.get("category", "inbox")
+    category = data.get("category", DEFAULT_CATEGORY)
     force = data.get("force", False)
 
     _save_note(title, body, tag_list, category, force, json_out)

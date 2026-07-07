@@ -15,7 +15,7 @@ import pytest
 from typer.testing import CliRunner
 
 from brain.cli import app
-from brain.config import ensure_structure, get_vault_dir
+from brain.config import DEFAULT_CATEGORY, ensure_structure, get_vault_dir
 from brain.index import init_db, rebuild_index, upsert_note
 from brain.vault import Note, load_note, note_path
 
@@ -152,7 +152,7 @@ class TestImport:
         note = load_note(Path(get_vault_dir()) / data["path"])
         assert note.body == ""
         assert note.tags == []
-        assert note.category == "inbox"
+        assert note.category == DEFAULT_CATEGORY
 
     def test_duplicate_warning(self, tmp_path: Path) -> None:
         """Importing a note with a similar title emits duplicate_warning."""

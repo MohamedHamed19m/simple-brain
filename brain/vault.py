@@ -20,7 +20,7 @@ from typing import Generator
 
 import frontmatter
 
-from brain.config import get_vault_dir
+from brain.config import DEFAULT_CATEGORY, get_vault_dir
 
 
 # ---------------------------------------------------------------------------
@@ -36,7 +36,7 @@ class Note:
         title: str,
         body: str,
         tags: list[str] | None = None,
-        category: str = "inbox",
+        category: str = DEFAULT_CATEGORY,
         created: str | None = None,
         updated: str | None = None,
         extra: dict | None = None,
@@ -114,7 +114,7 @@ def load_note(path: Path) -> Note:
         title=str(post.get("title", path.stem)),
         body=post.content,
         tags=list(post.get("tags") or []),
-        category=str(post.get("category", "inbox")),
+        category=str(post.get("category", DEFAULT_CATEGORY)),
         created=str(post.get("created", "")),
         updated=str(post.get("updated", "")),
         extra={
@@ -161,7 +161,7 @@ def find_note(slug_or_path: str, vault: Path | None = None) -> Note | None:
     return None
 
 
-def note_path(title: str, category: str = "inbox", vault: Path | None = None) -> Path:
+def note_path(title: str, category: str = DEFAULT_CATEGORY, vault: Path | None = None) -> Path:
     """Generate a filesystem path for a new note based on title + category."""
     root = vault or get_vault_dir()
     slug = re.sub(r"[^\w\s-]", "", title.lower())

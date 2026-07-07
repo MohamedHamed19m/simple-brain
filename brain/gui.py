@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING
 
 import customtkinter as ctk
 
-from brain.config import CATEGORIES, ensure_structure, get_index_path, get_vault_dir
+from brain.config import CATEGORIES, DEFAULT_CATEGORY, ensure_structure, get_index_path, get_vault_dir
 from brain.index import rebuild_index, remove_note, upsert_note
 from brain.search import read_top
 from brain.vault import Note, delete_note, find_note, iter_notes, note_path
@@ -431,7 +431,7 @@ class BrainApp(ctk.CTk):
         self.current_note = None
         self.title_entry.delete(0, "end")
         self.tags_entry.delete(0, "end")
-        self.cat_combo.set("inbox")
+        self.cat_combo.set(DEFAULT_CATEGORY)
         self.body_text.delete("0.0", "end")
         self._set_status("Editor cleared.")
 
@@ -514,7 +514,7 @@ class BrainApp(ctk.CTk):
             return
 
         # Generate path for new slug
-        new_path = note_path(title, category or "inbox", self.vault)
+        new_path = note_path(title, category or DEFAULT_CATEGORY, self.vault)
         new_slug = new_path.stem
 
         note = Note(
@@ -522,7 +522,7 @@ class BrainApp(ctk.CTk):
             title=title,
             body=body or "",
             tags=tag_list,
-            category=category or "inbox",
+            category=category or DEFAULT_CATEGORY,
         )
 
         try:

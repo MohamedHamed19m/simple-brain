@@ -74,11 +74,7 @@ The vault defaults to `~/.brain/` (or `$BRAIN_VAULT` when set).
 
 ```
 ~/.brain/
-├── knowledge/      # Permanent facts, solutions
-├── skills/         # How-to guides, workflows
-├── journal/        # Time-stamped reflections, logs
-├── projects/       # Project-specific context
-├── inbox/          # Unclassified / incoming notes (default)
+├── knowledge/      # Permanent facts, solutions (default)
 ├── <any-category>/ # Create your own via --category
 └── .brain_index.db # SQLite FTS5 index (auto-managed)
 ```
