@@ -4,7 +4,8 @@ cli.py — Typer CLI for the brain knowledge base.
 Commands
 --------
   brain ask       <query>          Search + compress → JSON (for agents)
-  brain remember  <title>          Add a new note (editor or --body)
+  brain remember  <title>          Add a new note (editor, --body, or --body-file)
+  brain import    <spec.json>      Add a note from a JSON spec (large/multiline bodies)
   brain forget    <slug>           Delete a note
   brain list                       List all notes
   brain show      <slug>           Print a note
@@ -32,7 +33,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from brain.config import ensure_structure, get_index_path, get_vault_dir
+from brain.config import DEFAULT_CATEGORY, ensure_structure, get_index_path, get_vault_dir
 from brain.index import init_db, rebuild_index, remove_note, upsert_note
 from brain.search import find_similar, read_top, search
 from brain.summarizer import compress
@@ -159,24 +160,18 @@ def ask(
 
 
 # ---------------------------------------------------------------------------
-# brain remember
+# Shared save helper
 # ---------------------------------------------------------------------------
 
-@app.command()
-def remember(
-    title: str = typer.Argument(..., help="Title of the new note"),
-    body: Optional[str] = typer.Option(None, "--body", help="Note body (skip editor)"),
-    tags: Optional[str] = typer.Option(None, "--tags", help="Comma-separated tags"),
-    category: str = typer.Option("inbox", "--category", "-c", help="Category sub-directory"),
-    force: bool = typer.Option(False, "--force", help="Overwrite if slug already exists"),
-    json_out: bool = typer.Option(False, "--json"),
+def _save_note(
+    title: str,
+    body: str,
+    tag_list: list[str],
+    category: str = DEFAULT_CATEGORY,
+    force: bool = False,
+    json_out: bool = False,
 ) -> None:
-    """
-    [bold]Save a new note to the vault.[/bold]
-
-    Opens your $EDITOR unless --body is provided.
-    Warns about potential duplicates before saving.
-    """
+    """Shared save flow for `remember` and `import`: duplicate detection → save → upsert."""
     _ensure_index()
     vault = get_vault_dir()
 
@@ -196,30 +191,23 @@ def remember(
                     indent=2,
                 )
             )
-        else:
-            console.print("[yellow]Similar notes found:[/yellow]")
-            for r in similar:
-                console.print(
-                    f"  [green]{r.score:.2f}[/green]  [bold]{r.title}[/bold]  [dim]{r.rel_path}[/dim]"
-                )
-            if not typer.confirm("Save anyway?"):
-                raise typer.Abort()
+            return
+        console.print("[yellow]Similar notes found:[/yellow]")
+        for r in similar:
+            console.print(
+                f"  [green]{r.score:.2f}[/green]  [bold]{r.title}[/bold]  [dim]{r.rel_path}[/dim]"
+            )
+        if not typer.confirm("Save anyway?"):
+            raise typer.Abort()
 
-    # --- get body ---
-    if body is None:
-        template = f"# {title}\n\n<!-- Write your note here -->\n"
-        body = _open_editor(template)
-        # strip the heading if the user left it
-        body = body.strip()
-        if body.startswith(f"# {title}"):
-            body = body[len(f"# {title}"):].strip()
-
-    tag_list = [t.strip() for t in tags.split(",")] if tags else []
     path = note_path(title, category, vault)
 
     if path.exists() and not force:
-        console.print(f"[red]Note already exists:[/red] {path}")
-        console.print("Use --force to overwrite.")
+        if json_out:
+            print(json.dumps({"status": "error", "error": f"Note already exists: {path}", "slug": path.stem}, indent=2))
+        else:
+            console.print(f"[red]Note already exists:[/red] {path}")
+            console.print("Use --force to overwrite.")
         raise typer.Exit(1)
 
     note = Note(
@@ -242,6 +230,107 @@ def remember(
         print(json.dumps(data, indent=2))
     else:
         console.print(f"[bold green]✓[/bold green] Saved → [cyan]{note.rel_path}[/cyan]")
+
+
+# ---------------------------------------------------------------------------
+# brain remember
+# ---------------------------------------------------------------------------
+
+@app.command()
+def remember(
+    title: str = typer.Argument(..., help="Title of the new note"),
+    body: Optional[str] = typer.Option(None, "--body", help="Note body (skip editor). Use --body-file for large/multiline bodies."),
+    body_file: Optional[Path] = typer.Option(None, "--body-file", help="Read body from a file (avoids shell quoting for large/multiline text). Takes precedence over --body."),
+    tags: Optional[str] = typer.Option(None, "--tags", help="Comma-separated tags"),
+    category: str = typer.Option(DEFAULT_CATEGORY, "--category", "-c", help="Category sub-directory"),
+    force: bool = typer.Option(False, "--force", help="Overwrite if slug already exists"),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    """
+    [bold]Save a new note to the vault.[/bold]
+
+    Opens your $EDITOR unless --body (or --body-file) is provided.
+    Warns about potential duplicates before saving.
+    """
+    # --- get body ---
+    if body_file:
+        body = body_file.read_text(encoding="utf-8")
+    elif body == "-":
+        body = sys.stdin.read()
+    elif body is None:
+        if not sys.stdin.isatty():
+            body = sys.stdin.read()
+        else:
+            template = f"# {title}\n\n\n"
+            body = _open_editor(template)
+            # strip the heading if the user left it
+            body = body.strip()
+            if body.startswith(f"# {title}"):
+                body = body[len(f"# {title}"):].strip()
+
+    tag_list = [t.strip() for t in tags.split(",")] if tags else []
+    _save_note(title, body, tag_list, category, force, json_out)
+
+
+# ---------------------------------------------------------------------------
+# brain import
+# ---------------------------------------------------------------------------
+
+@app.command(name="import")
+def import_note(
+    spec: str = typer.Argument(..., help="Path to JSON spec file, or '-' for stdin. Fields: title (required), body, tags (list or comma-string), category, force."),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    """
+    [bold]Save a note from a JSON spec file.[/bold]
+
+    Ideal for agents with large/multiline bodies — the entire note
+    specification lives in a file, so nothing big goes on the command line.
+
+    Example spec:
+    \b
+      {"title": "My Note", "body": "Content here", "tags": ["t1","t2"], "category": "knowledge", "force": false}
+    """
+    _ensure_index()
+
+    # --- read spec ---
+    if spec == "-":
+        raw = sys.stdin.read()
+    else:
+        try:
+            raw = Path(spec).read_text(encoding="utf-8")
+        except OSError as e:
+            data = {"status": "error", "error": f"Cannot read spec file: {e}"}
+            _out(data, json_out)
+            raise typer.Exit(1)
+
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        data = {"status": "error", "error": f"Invalid JSON in spec: {e}"}
+        _out(data, json_out)
+        raise typer.Exit(1)
+
+    title = data.get("title")
+    if not title:
+        data = {"status": "error", "error": "Spec must include a 'title' field (string)"}
+        _out(data, json_out)
+        raise typer.Exit(1)
+
+    body = data.get("body", "")
+
+    tags_raw = data.get("tags", [])
+    if isinstance(tags_raw, list):
+        tag_list = [str(t).strip() for t in tags_raw if str(t).strip()]
+    elif isinstance(tags_raw, str):
+        tag_list = [t.strip() for t in tags_raw.split(",") if t.strip()]
+    else:
+        tag_list = []
+
+    category = data.get("category", DEFAULT_CATEGORY)
+    force = data.get("force", False)
+
+    _save_note(title, body, tag_list, category, force, json_out)
 
 
 # ---------------------------------------------------------------------------

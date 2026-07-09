@@ -33,8 +33,11 @@ def get_index_path(vault: Path | None = None) -> Path:
     return v / ".brain_index.db"
 
 
-# Sub-directories inside the vault
-CATEGORIES = ("knowledge", "skills", "journal", "projects", "inbox")
+# Default category
+DEFAULT_CATEGORY = "knowledge"
+
+# Default sub-directories inside the vault (created by ensure_structure)
+CATEGORIES = ("knowledge",)
 
 
 def ensure_structure(vault: Path | None = None) -> None:

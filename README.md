@@ -29,7 +29,8 @@ uv tool install --editable .
 |---------|-------------|
 | `brain init` | Create vault structure and initialize index |
 | `brain ask <query>` | BM25 search + compress → structured answer |
-| `brain remember <title>` | Add a note (opens `$EDITOR` or uses `--body`) |
+| `brain remember <title>` | Add a note (opens `$EDITOR`, `--body`, or `--body-file`) |
+| `brain import <spec.json>` | Add a note from a JSON spec file (large/multiline bodies) |
 | `brain forget <slug>` | Delete a note from the vault and the index |
 | `brain show <slug>` | Print full note content |
 | `brain list` | List all notes currently in the vault |
@@ -39,18 +40,41 @@ uv tool install --editable .
 All commands support the `--json` flag for machine-readable outputs.
 
 ---
+## Agent Vault Setup
+
+If you're using this with the **`@brain_memory_agent`**, the vault lives **inside the agent's own config directory** — no env vars to set yourself.
+
+### One-time init per machine
+
+```bash
+# Gemini
+BRAIN_VAULT=.gemini/.brain brain init
+
+# Claude
+BRAIN_VAULT=.claude/.brain brain init
+```
+
+### How it works
+
+The agent instructions already tell `@brain_memory_agent` to set `BRAIN_VAULT` to the correct path before every command. **You don't need to set it manually** — the agent handles it every time it runs.
+
+If you also use `brain` commands directly (outside the agent), set the env var per session:
+
+```bash
+# PowerShell
+$env:BRAIN_VAULT = "$PWD\.gemini\.brain"
+brain ask "something"
+```
+
+---
 
 ## Vault Structure
 
-The vault defaults to `~/.brain/`. You can override this location by setting the `BRAIN_VAULT` environment variable.
+The vault defaults to `~/.brain/` (or `$BRAIN_VAULT` when set).
 
 ```
 ~/.brain/
-├── knowledge/      # Permanent facts, solutions
-├── skills/         # How-to guides, workflows
-├── journal/        # Time-stamped reflections, logs
-├── projects/       # Project-specific context
-├── inbox/          # Unclassified / incoming notes (default)
+├── knowledge/      # Permanent facts, solutions (default)
 ├── <any-category>/ # Create your own via --category
 └── .brain_index.db # SQLite FTS5 index (auto-managed)
 ```
@@ -87,7 +111,7 @@ Add this Section into your main contentx file (Gemini.md)
 **CRITICAL:** You MUST delegate all memory tasks to the **`@brain_memory_agent`**,
 
 **When to Invoke `@brain_memory_agent`:**
-* **Save/Remember:** To store solutions, context, or snippets (e.g., "save this", "remember"). (Subagent runs `brain remember`).
+* **Save/Remember:** To store solutions, context, or snippets (e.g., "save this", "remember"). (Subagent runs `brain import`).
 * **Search/Retrieve:** To recall past knowledge or query notes. (Subagent runs `brain ask/show`).
 * **Manage:** To list notes, delete (`brain forget`), or update (`brain rebuild`).
 
